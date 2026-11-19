@@ -1,0 +1,228 @@
+# ==============================================================================
+# Marketplace Burundi — fichiers exclus du depot
+#
+# Principe : on ne versionne que ce qui est ECRIT A LA MAIN. Tout ce qui est
+# genere (caches, build), local (environnement virtuel, base de donnees),
+# secret (.env) ou televerse par les utilisateurs (media) reste hors du depot.
+#
+# A NE JAMAIS AJOUTER ICI :
+#   - les migrations Django (backend/modules/*/migrations/0*.py) : elles font
+#     partie du code source. Sans elles, personne ne peut recreer la base.
+#   - backend/requirements/ : c'est la liste des dependances.
+#   - .env.example : le modele de configuration, sans aucun secret.
+# ==============================================================================
+
+
+# ------------------------------------------------------------------ secrets
+# Le .env contient le mot de passe de la base et celui de l'email.
+# Il ne doit JAMAIS partir sur GitHub. Seul .env.example est versionne.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.keystore
+# Fichier de compte de service Firebase (notifications push, module 12)
+**/serviceAccount*.json
+**/google-services.json
+**/GoogleService-Info.plist
+
+
+# ------------------------------------------------------------------- python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+# Artefacts d'empaquetage Python, ANCRES A LA RACINE.
+# Sans la barre oblique initiale, `lib/` avalerait tout le code source de
+# l'application Flutter, qui vit dans mobile/lib/.
+/build/
+/develop-eggs/
+/dist/
+/downloads/
+/eggs/
+/.eggs/
+/lib/
+/lib64/
+/parts/
+/sdist/
+/var/
+/wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+
+# ------------------------------------------------- environnements virtuels
+# Lourd, specifique a la machine, et reconstruit avec requirements/base.txt.
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+pip-log.txt
+pip-delete-this-directory.txt
+
+
+# ------------------------------------------------------------------- django
+# Base locale SQLite (la configuration de developpement utilise PostgreSQL,
+# mais une base de test peut apparaitre).
+*.sqlite3
+*.sqlite3-journal
+db.sqlite3
+db.sqlite3-journal
+
+# Fichiers statiques collectes : regeneres par `collectstatic`.
+/staticfiles/
+/static_root/
+backend/staticfiles/
+backend/static_root/
+
+# Televersements des utilisateurs (photos de profil, images d'annonces).
+# Le dossier est conserve dans le depot grace a son .gitkeep, son contenu non.
+backend/media/*
+!backend/media/.gitkeep
+
+# Journaux
+*.log
+logs/
+backend/logs/
+
+# Secret de session / cache local
+.django_cache/
+
+
+# -------------------------------------------------------------------- tests
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+nosetests.xml
+*.cover
+.hypothesis/
+
+# Schema OpenAPI genere a la demande (`manage.py spectacular`).
+schema.yml
+schema.yaml
+schema.json
+
+
+# ------------------------------------------------- outils de developpement
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.iml
+*.ipr
+*.iws
+.spyderproject
+.spyproject
+.ropeproject
+*.sublime-project
+*.sublime-workspace
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+.ipynb_checkpoints/
+
+
+# --------------------------------------------------------- systeme / Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+desktop.ini
+$RECYCLE.BIN/
+*.lnk
+# macOS et Linux, au cas ou un collegue y travaille
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+*~
+.fuse_hidden*
+.directory
+.nfs*
+
+
+# ---------------------------------------------------------- Flutter / mobile
+# Prepare pour l'application mobile a venir (dossier mobile/).
+mobile/build/
+mobile/.dart_tool/
+mobile/.packages
+mobile/.pub-cache/
+mobile/.pub/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/pubspec.lock
+mobile/**/*.g.dart
+mobile/**/*.freezed.dart
+mobile/**/generated_plugin_registrant.dart
+
+# Android
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/app/debug/
+mobile/android/app/profile/
+mobile/android/app/release/
+mobile/android/key.properties
+*.apk
+*.aab
+
+# iOS
+mobile/ios/Pods/
+mobile/ios/.symlinks/
+mobile/ios/Flutter/Flutter.framework/
+mobile/ios/Flutter/Flutter.podspec
+mobile/ios/Flutter/App.framework/
+mobile/ios/Flutter/flutter_assets/
+mobile/ios/Flutter/Generated.xcconfig
+mobile/ios/Flutter/ephemeral/
+mobile/ios/ServiceDefinitions.json
+mobile/ios/Runner/GeneratedPluginRegistrant.*
+*.ipa
+
+
+# ------------------------------------------------ front web d'administration
+# Prepare pour la console d'administration a venir (dossier admin-web/).
+node_modules/
+admin-web/node_modules/
+admin-web/dist/
+admin-web/build/
+admin-web/.next/
+admin-web/.nuxt/
+admin-web/.cache/
+admin-web/coverage/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+.eslintcache
+
+
+# -------------------------------------------------------------------- divers
+# Archives et exports locaux
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+*.bak
+*.tmp
+*.swp
+*.swo
+# Sauvegardes de base de donnees
+*.dump
+*.sql.gz
+backups/
