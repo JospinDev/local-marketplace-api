@@ -195,32 +195,47 @@ POST /api/v1/auth/register/
 Seuls `username`, `password` et `password_confirmation` sont obligatoires.
 
 Réponse `201` **avec email** : le compte existe mais n'est pas utilisable.
+Il est créé `is_active = false`, statut `EN_ATTENTE`, et un code part par
+email.
 
 ```json
 {
   "success": true,
-  "message": "Compte cree. Un code de verification a ete envoye a votre email.",
-  "verification_email_requise": true,
+  "message": "Compte cree. Un code de verification a ete envoye a chris@exemple.bi. Le compte sera actif apres validation du code.",
+  "email_verification_requise": true,
   "utilisateur": { "id": 12, "username": "chris", "email_verifie": false, "...": "..." }
 }
 ```
 
-Réponse `201` **sans email** : le compte est immédiatement utilisable, et la
-réponse contient déjà les jetons — enchaînez directement sur l'accueil.
+Réponse `201` **sans email** : le compte est immédiatement utilisable.
 
 ```json
 {
   "success": true,
-  "message": "Compte cree.",
-  "verification_email_requise": false,
-  "access": "eyJhbGciOi...",
-  "refresh": "eyJhbGciOi...",
+  "message": "Compte cree. Vous pouvez vous connecter immediatement.",
+  "email_verification_requise": false,
   "utilisateur": { "...": "..." }
 }
 ```
 
-> **Branchez votre navigation sur `verification_email_requise`**, pas sur la
+> **Branchez votre navigation sur `email_verification_requise`**, pas sur la
 > présence de l'email dans le formulaire : c'est le serveur qui décide.
+>
+> Attention au nom exact du champ : c'est `email_verification_requise`, et
+> non `verification_email_requise`. Les deux mots inversés se lisent
+> identiquement en diagonale, mais une faute ici donne toujours `null`, donc
+> `false` — l'écran de saisie du code n'apparaît alors **jamais**, et le
+> compte reste bloqué en `EN_ATTENTE` sans que personne ne comprenne
+> pourquoi.
+
+> **`/auth/register/` ne renvoie aucun jeton**, dans aucun des deux cas.
+> Après une inscription sans email, enchaînez vous-même sur
+> `POST /auth/login/` avec les identifiants déjà saisis : l'utilisateur ne
+> voit rien, et vous obtenez de vrais jetons.
+>
+> Ne déclarez **jamais** une session ouverte à partir du seul objet
+> `utilisateur` de cette réponse : l'application paraîtrait connectée alors
+> que le coffre est vide, et chaque appel authentifié répondrait `401`.
 
 Si l'envoi de l'email échoue (SMTP injoignable), vous recevez `503` et **le
 compte n'est pas créé** : l'inscription est annulée en entier, pour ne pas
@@ -1336,6 +1351,14 @@ l'explique.
 9. **Oublier `DELETE /notifications/devices/{jeton}/`** à la déconnexion.
 10. **Construire une liste déroulante de provinces.** La localisation est un
     texte libre, et la recherche fonctionne par « contient ».
+11. **Recopier un nom de champ de mémoire.** `email_verification_requise`
+    s'est déjà fait lire `verification_email_requise` : la valeur devient
+    `null`, puis `false`, et l'écran de code n'apparaît jamais. Copiez les
+    noms depuis Swagger, et faites échouer bruyamment une clé absente
+    plutôt que de la remplacer par une valeur par défaut silencieuse.
+12. **Déclarer une session ouverte sans jeton.** Posez l'invariant une
+    fois — « pas de jeton en coffre, pas de session » — au seul endroit qui
+    fait passer l'application à l'état connecté.
 
 ---
 
