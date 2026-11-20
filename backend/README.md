@@ -783,10 +783,28 @@ même si les services push ne sont pas disponibles ». D'où la hiérarchie :
 2. le **WebSocket** la transmet instantanément si l'utilisateur est connecté ;
 3. le **push** (Firebase ou autre) la pousse si une clé est configurée.
 
-Sans `FCM_SERVER_KEY` dans le `.env`, le service push est simplement inactif :
-aucune erreur, aucune exception, et l'historique reste complet.
+Sans `FIREBASE_CREDENTIALS_PATH` dans le `.env`, le service push est
+simplement inactif : aucune erreur, aucune exception, et l'historique reste
+complet. Même chose si `firebase-admin` n'est pas installé — c'est une
+dépendance **facultative**, volontairement laissée commentée dans
+`requirements/base.txt`.
+
 `GET /notifications/devices/status/` permet à l'application mobile de savoir
 si elle doit proposer l'activation du push, au lieu de le deviner.
+
+> **L'ancienne clé serveur FCM n'existe plus.** Google a désactivé l'API
+> « legacy » en 2024 : une `FCM_SERVER_KEY` ne fonctionne plus, quelle que
+> soit sa valeur. L'API actuelle (HTTP v1) s'authentifie avec un **compte de
+> service** — un fichier JSON téléchargé depuis la console Firebase
+> (Paramètres du projet → Comptes de service → Générer une nouvelle clé
+> privée). Ce fichier se place **hors du dépôt** : il est déjà couvert par le
+> `.gitignore` (`**/serviceAccount*.json`).
+>
+> ```bash
+> pip install firebase-admin
+> # puis dans .env :
+> # FIREBASE_CREDENTIALS_PATH=C:/chemin/vers/marketplace-firebase-adminsdk.json
+> ```
 
 ### Une notification ne casse jamais l'opération qui la déclenche
 

@@ -471,18 +471,52 @@ class AppareilsPushTests(BaseNotificationTests):
         self.assertFalse(reponse.data["push_configure"])
         self.assertEqual(reponse.data["appareils_actifs"], 0)
 
-    @override_settings(FCM_SERVER_KEY="une-cle-de-test")
     def test_etat_du_push_configure(self):
+        """`push_configure` ne vaut vrai que si tout est reellement pret.
+
+        Le service verifie trois choses : le reglage renseigne, le fichier
+        d'identifiants existant, et `firebase-admin` installe. On simule
+        donc le verdict du service plutot que de poser un vrai fichier.
+        """
         AppareilPush.objects.create(
             utilisateur=self.acheteur, jeton="j", plateforme="ANDROID"
         )
-        reponse = self.client.get(f"{URL}devices/status/")
+        with mock.patch.object(PushService, "est_configure", return_value=True):
+            reponse = self.client.get(f"{URL}devices/status/")
         self.assertTrue(reponse.data["push_configure"])
         self.assertEqual(reponse.data["appareils_actifs"], 1)
 
 
 class PushTests(BaseNotificationTests):
-    def test_sans_cle_le_push_est_inactif(self):
+    """Transport push, API FCM HTTP v1 (compte de service).
+
+    Aucun de ces tests ne sort sur le reseau ni n'exige `firebase-admin` :
+    le module de messagerie de Firebase est simule. C'est volontaire — le
+    push est une dependance FACULTATIVE, et la suite doit passer sur une
+    machine qui ne l'a jamais installe.
+    """
+
+    def setUp(self):
+        super().setUp()
+        # Chaque test repart d'un service non initialise.
+        PushService.reinitialiser()
+        self.addCleanup(PushService.reinitialiser)
+
+    def _messagerie_simulee(self):
+        """Faux module `firebase_admin.messaging`, reduit a l'utile."""
+        faux = mock.MagicMock()
+
+        class UnregisteredError(Exception):
+            pass
+
+        class SenderIdMismatchError(Exception):
+            pass
+
+        faux.UnregisteredError = UnregisteredError
+        faux.SenderIdMismatchError = SenderIdMismatchError
+        return faux
+
+    def test_sans_configuration_le_push_est_inactif(self):
         """Regle du CD : l'application fonctionne sans service push."""
         AppareilPush.objects.create(
             utilisateur=self.acheteur, jeton="j", plateforme="ANDROID"
@@ -494,33 +528,83 @@ class PushTests(BaseNotificationTests):
         self.assertEqual(PushService.envoyer(notification), 0)
         # La notification interne existe quand meme.
         self.assertIsNotNone(notification.pk)
+        self.assertEqual(Notification.objects.de(self.acheteur).count(), 1)
 
-    @override_settings(FCM_SERVER_KEY="une-cle-de-test")
-    def test_avec_cle_un_envoi_par_appareil(self):
+    @override_settings(FIREBASE_CREDENTIALS_PATH="C:/introuvable/compte.json")
+    def test_un_chemin_errone_ne_casse_rien(self):
+        """L'erreur de configuration la plus courante : un chemin mal copie."""
+        AppareilPush.objects.create(
+            utilisateur=self.acheteur, jeton="j", plateforme="ANDROID"
+        )
+        self.assertFalse(PushService.est_configure())
+        notification = NotificationService.creer(
+            self.acheteur, TypeNotification.MESSAGE_NOUVEAU, "Titre", ""
+        )
+        self.assertIsNotNone(notification)
+
+    @override_settings(FIREBASE_CREDENTIALS_PATH="C:/faux/compte.json")
+    def test_un_envoi_par_appareil(self):
         for jeton in ("j1", "j2"):
             AppareilPush.objects.create(
                 utilisateur=self.acheteur, jeton=jeton, plateforme="ANDROID"
             )
-        # Le transport est simule pendant TOUT le test : un test ne doit
-        # jamais sortir sur le reseau, et `creer` declenche deja un envoi.
-        with mock.patch.object(PushService, "_envoyer", return_value=True) as envoi:
+        messagerie = self._messagerie_simulee()
+
+        with mock.patch.object(
+            PushService, "_messagerie", return_value=messagerie
+        ):
             notification = NotificationService.creer(
                 self.acheteur, TypeNotification.MESSAGE_NOUVEAU, "Titre", "Corps"
             )
-            self.assertEqual(envoi.call_count, 2)
+            # `creer` a deja declenche un envoi par appareil.
+            self.assertEqual(messagerie.send.call_count, 2)
             self.assertEqual(PushService.envoyer(notification), 2)
-        self.assertEqual(envoi.call_count, 4)
 
-    @override_settings(FCM_SERVER_KEY="une-cle-de-test")
-    def test_un_jeton_refuse_est_desactive(self):
-        """Un jeton desinscrit ne doit pas etre retente indefiniment."""
-        import urllib.error
+        self.assertEqual(messagerie.send.call_count, 4)
 
+    @override_settings(FIREBASE_CREDENTIALS_PATH="C:/faux/compte.json")
+    def test_la_charge_utile_porte_le_lien_profond(self):
+        """L'application mobile doit pouvoir ouvrir le bon ecran."""
+        AppareilPush.objects.create(
+            utilisateur=self.acheteur, jeton="j", plateforme="ANDROID"
+        )
+        messagerie = self._messagerie_simulee()
+
+        with mock.patch.object(
+            PushService, "_messagerie", return_value=messagerie
+        ):
+            NotificationService.creer(
+                self.acheteur,
+                TypeNotification.RESERVATION_ACCEPTEE,
+                "Reservation acceptee",
+                "2 unites mises de cote",
+                reference_type="reservation",
+                reference_id=42,
+                donnees={"produit_id": 5},
+            )
+
+        # `Message(...)` a bien ete construit avec les donnees de routage.
+        _, kwargs = messagerie.Message.call_args
+        donnees = kwargs["data"]
+        self.assertEqual(donnees["type"], "RESERVATION_ACCEPTEE")
+        self.assertEqual(donnees["reference_type"], "reservation")
+        self.assertEqual(donnees["reference_id"], "42")
+        # FCM v1 n'accepte que des chaines : tout est converti.
+        self.assertEqual(donnees["produit_id"], "5")
+        self.assertTrue(all(isinstance(v, str) for v in donnees.values()))
+
+    @override_settings(FIREBASE_CREDENTIALS_PATH="C:/faux/compte.json")
+    def test_un_jeton_desinscrit_est_desactive(self):
+        """Un appareil desinstalle ne doit pas etre retente indefiniment."""
         AppareilPush.objects.create(
             utilisateur=self.acheteur, jeton="perime", plateforme="ANDROID"
         )
-        erreur = urllib.error.HTTPError("https://exemple", 404, "Not Found", {}, None)
-        with mock.patch("urllib.request.urlopen", side_effect=erreur):
+        messagerie = self._messagerie_simulee()
+        messagerie.send.side_effect = messagerie.UnregisteredError("inconnu")
+
+        with mock.patch.object(
+            PushService, "_messagerie", return_value=messagerie
+        ):
             notification = NotificationService.creer(
                 self.acheteur, TypeNotification.MESSAGE_NOUVEAU, "Titre", ""
             )
@@ -528,33 +612,61 @@ class PushTests(BaseNotificationTests):
 
         self.assertFalse(
             AppareilPush.objects.get(jeton="perime").actif,
-            "Un jeton refuse en 404 doit etre desactive.",
+            "Un jeton refuse par Google doit etre desactive.",
         )
 
-    @override_settings(FCM_SERVER_KEY="une-cle-de-test")
+    @override_settings(FIREBASE_CREDENTIALS_PATH="C:/faux/compte.json")
+    def test_une_panne_passagere_ne_desactive_pas_le_jeton(self):
+        """Une coupure reseau n'est pas un appareil desinscrit."""
+        AppareilPush.objects.create(
+            utilisateur=self.acheteur, jeton="valide", plateforme="ANDROID"
+        )
+        messagerie = self._messagerie_simulee()
+        messagerie.send.side_effect = OSError("reseau coupe")
+
+        with mock.patch.object(
+            PushService, "_messagerie", return_value=messagerie
+        ):
+            notification = NotificationService.creer(
+                self.acheteur, TypeNotification.MESSAGE_NOUVEAU, "Titre", ""
+            )
+
+        self.assertIsNotNone(notification)
+        self.assertTrue(
+            AppareilPush.objects.get(jeton="valide").actif,
+            "Une panne passagere ne doit pas condamner le jeton.",
+        )
+        self.assertEqual(Notification.objects.de(self.acheteur).count(), 1)
+
+    @override_settings(FIREBASE_CREDENTIALS_PATH="C:/faux/compte.json")
     def test_un_appareil_inactif_est_ignore(self):
         AppareilPush.objects.create(
-            utilisateur=self.acheteur, jeton="j", plateforme="ANDROID", actif=False
+            utilisateur=self.acheteur,
+            jeton="j",
+            plateforme="ANDROID",
+            actif=False,
         )
-        notification = NotificationService.creer(
-            self.acheteur, TypeNotification.MESSAGE_NOUVEAU, "Titre", ""
-        )
-        self.assertEqual(PushService.envoyer(notification), 0)
+        messagerie = self._messagerie_simulee()
+        with mock.patch.object(
+            PushService, "_messagerie", return_value=messagerie
+        ):
+            notification = NotificationService.creer(
+                self.acheteur, TypeNotification.MESSAGE_NOUVEAU, "Titre", ""
+            )
+            self.assertEqual(PushService.envoyer(notification), 0)
+        messagerie.send.assert_not_called()
 
-    @override_settings(FCM_SERVER_KEY="une-cle-de-test")
-    def test_une_panne_du_service_push_ne_casse_rien(self):
+    def test_sans_firebase_admin_le_service_se_tait(self):
+        """La bibliotheque est facultative : son absence n'est pas une erreur."""
         AppareilPush.objects.create(
             utilisateur=self.acheteur, jeton="j", plateforme="ANDROID"
         )
-        with mock.patch(
-            "urllib.request.urlopen", side_effect=OSError("reseau coupe")
-        ):
+        with mock.patch.object(PushService, "_messagerie", return_value=None):
             notification = NotificationService.creer(
-                self.acheteur, TypeNotification.MESSAGE_NOUVEAU, "Titre", "Corps"
+                self.acheteur, TypeNotification.MESSAGE_NOUVEAU, "Titre", ""
             )
-        # La notification interne est bien enregistree.
+            self.assertEqual(PushService.envoyer(notification), 0)
         self.assertIsNotNone(notification)
-        self.assertEqual(Notification.objects.de(self.acheteur).count(), 1)
 
 
 class RobustesseTests(BaseNotificationTests):

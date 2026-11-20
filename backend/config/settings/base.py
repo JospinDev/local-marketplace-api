@@ -306,9 +306,17 @@ EVALUATION_DELAI_MODIFICATION_HEURES = config(
 # Seuil de l'alerte "produit presque epuise", en unites restantes.
 STOCK_SEUIL_ALERTE = config("STOCK_SEUIL_ALERTE", default=3, cast=int)
 
-# Notifications push : COMPLEMENTAIRES. Sans cle, le service est inactif et
-# l'application continue de fonctionner (notifications internes + WebSocket),
-# comme l'exige le cahier des charges.
-FCM_SERVER_KEY = config("FCM_SERVER_KEY", default="")
-FCM_URL = config("FCM_URL", default="https://fcm.googleapis.com/fcm/send")
-FCM_TIMEOUT = config("FCM_TIMEOUT", default=5, cast=int)
+# Notifications push : COMPLEMENTAIRES. Sans fichier d'identifiants, le
+# service est inactif et l'application continue de fonctionner
+# (notifications internes + WebSocket), comme l'exige le cahier des charges.
+#
+# Firebase Cloud Messaging, API HTTP v1. L'ancienne « cle serveur »
+# (`FCM_SERVER_KEY`) a ete DESACTIVEE par Google en 2024 : elle ne
+# fonctionne plus, quelle que soit sa valeur. L'authentification se fait
+# desormais avec un compte de service, c'est-a-dire un fichier JSON
+# telecharge depuis la console Firebase (Parametres du projet > Comptes de
+# service > Generer une nouvelle cle privee).
+#
+# Ce fichier donne un acces complet a l'envoi de notifications : il se
+# place HORS du depot et n'est jamais versionne.
+FIREBASE_CREDENTIALS_PATH = config("FIREBASE_CREDENTIALS_PATH", default="")

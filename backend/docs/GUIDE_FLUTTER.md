@@ -1204,6 +1204,37 @@ DELETE /api/v1/notifications/devices/{jeton}/  désinscrire un appareil
 GET    /api/v1/notifications/devices/status/   le push est-il configuré ?
 ```
 
+### Côté Flutter, pour activer le push
+
+Le serveur utilise **FCM HTTP v1** (l'API « legacy » et sa clé serveur ont
+été désactivées par Google en 2024). Côté application, cela ne change rien à
+la marche à suivre :
+
+```bash
+dart pub global activate flutterfire_cli
+flutterfire configure     # génère firebase_options.dart + google-services.json
+flutter pub add firebase_core firebase_messaging
+```
+
+Le nom de paquet déclaré dans la console Firebase doit être **identique** à
+`applicationId` dans `android/app/build.gradle.kts`, sinon le jeton sera
+rejeté à l'envoi.
+
+```dart
+final jeton = await FirebaseMessaging.instance.getToken();
+if (jeton != null) await api.enregistrerAppareil(jeton);
+
+// Le jeton change : à la réinstallation, au nettoyage des données, et
+// parfois spontanément. Sans cet écouteur, les notifications cessent
+// d'arriver sans que personne ne comprenne pourquoi.
+FirebaseMessaging.instance.onTokenRefresh.listen(api.enregistrerAppareil);
+```
+
+FCM exige les **Google Play Services** sur l'appareil. C'est le cas de la
+grande majorité des téléphones Android, mais pas de tous (certains Huawei
+récents en sont dépourvus). D'où la règle déjà énoncée : l'historique et le
+WebSocket restent la source de vérité, le push n'est qu'un confort.
+
 Enregistrer l'appareil, après avoir obtenu le jeton FCM :
 
 ```json

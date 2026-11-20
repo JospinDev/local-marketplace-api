@@ -10,3 +10,10 @@ django-cors-headers==4.7.0
 channels==4.2.0
 channels-redis==4.2.1
 daphne==4.1.2
+
+# --- notifications push (module 12) : FACULTATIF -----------------------
+# Sans ce paquet, le push est simplement inactif : les notifications
+# internes et le temps reel fonctionnent normalement. A installer
+# uniquement si vous activez Firebase.
+#   pip install firebase-admin
+# firebase-admin==6.5.0
