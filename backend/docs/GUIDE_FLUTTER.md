@@ -760,14 +760,41 @@ Trames que vous envoyez :
 | `erreur` | règle violée (message vide, conversation bloquée) | `message` |
 
 Codes de fermeture : `4401` non authentifié, `4403` non participant ou compte
-suspendu, `4404` conversation inexistante.
+suspendu, `4404` conversation inexistante. Un `1011` ne vient pas de vous :
+c'est une erreur interne du serveur, à chercher dans sa console.
 
-**Deux points qui vous feront gagner du temps.**
+> **Côté serveur.** `CHANNEL_LAYERS` fixe explicitement
+> `socket_timeout: 20`, qui doit rester **supérieur** au `brpop_timeout` de
+> channels-redis (5 s). redis-py 8 a changé le défaut de `socket_timeout` de
+> `None` à 5 s : la lecture de la socket expirait alors exactement pendant le
+> pop bloquant, chaque consumer mourait sur `redis.exceptions.TimeoutError` et
+> la connexion se fermait en `1011` au bout de cinq secondes. Aucun test ne
+> l'avait vu, parce que la suite tourne sur `InMemoryChannelLayer` ;
+> `tests/test_channel_layer_config.py` garde désormais cette inégalité.
+
+**Quatre points qui vous feront gagner du temps.**
 
 L'expéditeur reçoit aussi son propre `message.nouveau` : utilisez-le comme
 accusé de réception (remplacez le message « en cours d'envoi » par celui du
 serveur, qui porte le vrai `id` et la vraie date) plutôt que d'afficher deux
 fois la même bulle.
+
+⚠️ **La charge utile du WebSocket ne contient PAS `est_de_moi`**, alors que
+celle de l'API REST l'expose. C'est logique : la trame diffusée est identique
+pour les deux participants du groupe, le serveur ne peut donc pas y mettre un
+champ qui dépend du lecteur. Déduisez-le vous-même en comparant `expediteur`
+à l'identifiant du compte connecté. Si vous l'oubliez, vos propres messages
+poussés par le canal s'afficheront du côté de l'interlocuteur.
+
+⚠️ **`GET /conversations/{id}/messages/` trie par `created_at` CROISSANT** :
+le plus ancien d'abord. Si vous affichez une `ListView(reverse: true)` — le
+réflexe habituel pour un chat, car le bas reste collé au dernier message —
+il faut inverser la page reçue, sinon l'historique s'affiche à l'envers et
+les nouveaux messages apparaissent en haut.
+
+`messages.lus` est diffusé **aux deux** participants. Comparez `lu_par` à
+votre identifiant avant de faire passer vos bulles en « lu », sinon votre
+propre lecture se fera passer pour celle de l'autre.
 
 Un message envoyé **par REST** arrive aussi sur le socket, et inversement :
 les deux chemins passent par le même service côté serveur. Vous pouvez donc

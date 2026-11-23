@@ -243,11 +243,25 @@ REDIS_URL = config(
     default=f"redis://{_authentification}{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}",
 )
 
+# `socket_timeout` est explicite et PLUS GRAND que les 5 secondes du
+# `bzpopmin` de channels-redis. redis-py 8 a change le defaut de
+# `socket_timeout` de None a 5 secondes : le delai de lecture de la socket
+# expirait donc exactement quand le pop bloquant devait rendre la main, et
+# chaque consumer mourait sur `redis.exceptions.TimeoutError` au bout de
+# cinq secondes, ferme avec le code 1011. Le symptome cote mobile etait un
+# temps reel qui se reconnectait sans fin.
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [REDIS_URL],
+            "hosts": [
+                {
+                    "address": REDIS_URL,
+                    "socket_timeout": 20,
+                    "socket_connect_timeout": 5,
+                    "socket_keepalive": True,
+                }
+            ],
             "capacity": 1000,
             "expiry": 30,
         },
