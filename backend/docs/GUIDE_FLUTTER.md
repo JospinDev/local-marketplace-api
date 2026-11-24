@@ -1121,6 +1121,22 @@ GET /api/v1/reviews/my-rating/
 Les trois valeurs ne comptent que les avis **valides** : un avis masqué par la
 modération ou retiré par son auteur n'entre dans aucune moyenne.
 
+> ⚠️ **Trois points vérifiés contre le serveur.**
+>
+> `DELETE /reviews/{id}/` répond **`200` avec l'avis**, et non `204` : l'avis
+> revient avec `est_valide: false`. Traitez-le comme les autres actions, qui
+> renvoient toutes l'enveloppe `{success, message, evaluation}`.
+>
+> Le serializer **n'expose pas** `est_modifiable` ni le délai restant. Le
+> délai de correction est configurable côté plateforme
+> (`EVALUATION_DELAI_MODIFICATION_HEURES`, 48 h par défaut) : calculez le
+> compte à rebours depuis `created_at` pour l'affichage, mais laissez le
+> `400` du serveur trancher — son message est précis et affichable tel quel.
+>
+> `Reputation` retombe à `null` dès qu'il n'y a plus d'avis valide. Ne
+> recalculez jamais une moyenne depuis une liste paginée : seul le serveur
+> sait quels avis sont valides.
+
 ### Droits
 
 Vous voyez les avis que vous avez écrits **et** ceux reçus sur vos ventes.
