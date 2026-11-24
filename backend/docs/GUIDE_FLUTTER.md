@@ -1183,6 +1183,69 @@ aucun identifiant à passer, donc rien à falsifier.
 
 ---
 
+## 10 bis. Bandeau publicitaire de l'accueil
+
+### La logique métier
+
+Un bandeau d'images administré, en haut de l'accueil. **Il n'existe que si
+l'administration a publié quelque chose** : quand la liste revient vide,
+l'emplacement doit disparaître entièrement, sans hauteur réservée ni cadre
+vide. C'est la règle principale de cet écran.
+
+Le serveur applique déjà tous les filtres — publicité active, fenêtre de
+diffusion, et interrupteur global de la plateforme. **Ne refaites aucun
+filtrage côté mobile** : une liste vide est une réponse normale.
+
+### Endpoints
+
+```
+GET  /api/v1/public/ads/              le bandeau, sans compte
+GET  /api/v1/public/ads/state/        état, sans télécharger les images
+POST /api/v1/public/ads/{id}/click/   compteur de clics
+```
+
+La route n'est **pas paginée** : elle renvoie une liste nue, et non un objet
+`{count, results}`.
+
+```json
+[
+  {
+    "id": 1,
+    "titre": "Soldes de fin d'année",
+    "sous_titre": "Jusqu'à 40 % sur une sélection d'annonces",
+    "image": "http://.../media/publicites/2026/11/pub.jpg",
+    "libelle_action": "Voir les offres",
+    "type_cible": "PRODUIT",
+    "type_cible_libelle": "Une annonce",
+    "cible_id": 11,
+    "cible_url": "",
+    "ordre": 0
+  }
+]
+```
+
+`type_cible` décide de la navigation à l'appui : `AUCUNE` (rien), `PRODUIT`
+(`cible_id`), `CATEGORIE` (`cible_id`), `VENDEUR` (`cible_id`, la boutique),
+`URL` (`cible_url`, dans le navigateur externe — jamais dans une vue
+interne, la personne doit voir où elle va).
+
+`libelle_action` vide signifie **pas de bouton**.
+
+### Trois détails d'interface qui comptent
+
+- **Le défilement automatique s'interrompt sous le doigt.** Reprendre à
+  défiler pendant que la personne regarde est désagréable. Un `Listener`
+  autour du `PageView` suffit.
+- **Une seule publicité ne défile pas.** Animer un élément unique attire
+  l'œil pour rien.
+- **Aucun message d'erreur.** Chargement comme échec : on n'affiche rien.
+  Une publicité est un supplément, pas un contenu dont l'absence mérite un
+  encart.
+
+Le compteur de clics est indicatif : un échec s'avale en silence.
+
+---
+
 ## 11. Notifications
 
 ### La logique métier
@@ -1211,6 +1274,23 @@ notifications push : le serveur n'a pas de clé, rien ne partira.
 
 Il n'existe aucun moyen de créer une notification depuis l'application :
 c'est toujours la conséquence d'un événement métier.
+
+> ⚠️ **Noms de champs vérifiés contre le serveur.** Le compteur est
+> `GET /notifications/unread-count/` → `{"non_lues": N}`. Le filtre de la
+> liste est **`?non_lues=true`**, et non `est_lue=false`. Se tromper ici
+> donne une liste complète là où on voulait les non lues.
+>
+> Chaque notification porte `reference_type` et `reference_id` : c'est le
+> serveur qui décide de la cible, le client ne fait que traduire en route.
+> Les six valeurs émises sont `conversation`, `reservation`, `vente`,
+> `produit`, `evaluation` et `utilisateur`. Appuyer sur une notification
+> doit la marquer lue **et** ouvrir sa cible : un vendeur qui reçoit une
+> demande de réservation arrive ainsi directement sur la demande, prête à
+> être acceptée.
+>
+> Le canal `/ws/notifications/` doit rester ouvert pendant toute la
+> session, et pas seulement quand l'écran des notifications est affiché :
+> sinon la pastille de la cloche ne bouge jamais.
 
 ### Les événements que vous recevrez
 

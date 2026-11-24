@@ -53,6 +53,7 @@ LOCAL_APPS = [
     "modules.reviews",
     "modules.notifications",
     "modules.moderation",
+    "modules.ads",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -187,6 +188,7 @@ SPECTACULAR_SETTINGS = {
         "MoyenPaiementEnum": "modules.sales.models.MoyenPaiement.choices",
         "ActionAuditEnum": "modules.moderation.models.ActionAudit.choices",
         "TypeValeurParametreEnum": "modules.moderation.models.TypeValeurParametre.choices",
+        "TypeCiblePubliciteEnum": "modules.ads.models.TypeCiblePublicite.choices",
         "TypeNotificationEnum": "modules.notifications.models.TypeNotification.choices",
         "PlateformeAppareilEnum": "modules.notifications.models.PlateformeAppareil.choices",
         "StatutEvaluationEnum": "modules.reviews.models.StatutEvaluation.choices",

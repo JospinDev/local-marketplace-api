@@ -31,6 +31,7 @@ urlpatterns = [
     path(API_V1, include("modules.reviews.urls")),
     path(API_V1, include("modules.notifications.urls")),
     path(API_V1, include("modules.moderation.urls")),
+    path(API_V1, include("modules.ads.urls")),
 ]
 
 if settings.DEBUG:

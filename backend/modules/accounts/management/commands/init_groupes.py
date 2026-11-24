@@ -64,6 +64,13 @@ PERMISSIONS_MODERATEUR = [
     "products.view_mouvementstock",
     # --- journal d'audit (module 14) : lecture seule --------------------
     "moderation.view_journalaudit",
+    # --- publicites : le bandeau de l'accueil mobile --------------------
+    # Le moderateur gere le contenu du bandeau, interrupteur global
+    # compris. `delete_publicite` reste au superutilisateur : supprimer
+    # une publicite efface aussi ses compteurs, et desactiver suffit.
+    "ads.view_publicite",
+    "ads.add_publicite",
+    "ads.change_publicite",
 ]
 
 

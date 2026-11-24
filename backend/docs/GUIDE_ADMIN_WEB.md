@@ -825,6 +825,139 @@ bug.
 
 ---
 
+## 11. Publicités — le bandeau de l'accueil mobile
+
+### Ce que c'est
+
+Un bandeau d'images en haut de l'accueil de l'application mobile. Il défile
+tout seul vers la gauche et s'arrête dès que l'utilisateur pose le doigt
+dessus.
+
+**Règle à comprendre avant de coder l'écran :** quand il n'y a rien à
+diffuser, l'emplacement **disparaît entièrement** côté mobile — pas de cadre
+vide, pas de hauteur réservée. C'est pourquoi la route publique renvoie une
+liste vide plutôt qu'une erreur, et pourquoi l'interrupteur global existe.
+
+### Deux niveaux d'extinction
+
+| Niveau | Où | Effet |
+| ------ | -- | ----- |
+| `actif` + `debut_le` / `fin_le` | sur chaque publicité | retire cette publicité seule |
+| `PUBLICITES_ACTIVES` | interrupteur global | fait disparaître **tout** le bandeau |
+
+L'interrupteur global existe pour éteindre le bandeau d'un geste, sans avoir
+à désactiver les publicités une par une ni à les supprimer. Il est stocké
+dans `ParametrePlateforme`, comme les autres réglages du module 14.
+
+Par défaut, l'interrupteur est **allumé** : une plateforme neuve n'a aucune
+publicité, donc rien ne s'affiche de toute façon, et personne n'a à penser à
+l'allumer avant sa première publicité.
+
+### Endpoints
+
+```
+GET    /api/v1/public/ads/              bandeau à afficher (public, sans compte)
+GET    /api/v1/public/ads/state/        état du bandeau (public)
+POST   /api/v1/public/ads/{id}/click/   compteur de clics (public)
+
+GET    /api/v1/admin/ads/               toutes les publicités, actives ou non
+POST   /api/v1/admin/ads/               créer                  — multipart
+GET    /api/v1/admin/ads/{id}/
+PATCH  /api/v1/admin/ads/{id}/          modifier
+DELETE /api/v1/admin/ads/{id}/          supprimer              — superutilisateur
+GET    /api/v1/admin/ads/state/         lire l'interrupteur    — view_publicite
+POST   /api/v1/admin/ads/toggle/        basculer l'interrupteur — change_publicite
+POST   /api/v1/admin/ads/reorder/       réordonner le bandeau
+```
+
+⚠️ **Lire l'interrupteur et le basculer sont deux routes distinctes**, et ce
+n'est pas un détail d'esthétique. `action_permissions` est indexé par nom
+d'action : une action unique acceptant GET et POST n'aurait pu exiger qu'une
+seule permission, et un compte en lecture seule aurait pu éteindre tout le
+bandeau. `GET /state/` demande `view_publicite`, `POST /toggle/` demande
+`change_publicite`.
+
+### Créer une publicité
+
+L'image est un fichier : la requête est en `multipart/form-data`, pas en
+JSON.
+
+```
+POST /api/v1/admin/ads/
+Content-Type: multipart/form-data
+
+titre          = Soldes de fin d'année
+sous_titre     = Jusqu'à 40 % sur une sélection d'annonces
+image          = <fichier>
+libelle_action = Voir les offres
+type_cible     = PRODUIT
+cible_id       = 11
+ordre          = 0
+```
+
+`type_cible` vaut `AUCUNE`, `PRODUIT`, `CATEGORIE`, `VENDEUR` ou `URL`. Les
+règles de cohérence sont vérifiées côté serveur et renvoient `400` :
+
+- `URL` sans `cible_url` → refusé ;
+- `PRODUIT`, `CATEGORIE` ou `VENDEUR` sans `cible_id` → refusé ;
+- `fin_le` antérieur à `debut_le` → refusé.
+
+Ce contrôle évite une publicité cliquable qui ne mènerait nulle part — elle
+s'afficherait normalement et l'appui ne ferait rien, ce qui est le pire des
+cas.
+
+`libelle_action` vide signifie « pas de bouton » : le mobile dessine alors
+l'image et le texte seuls.
+
+### Réordonner
+
+```json
+POST /api/v1/admin/ads/reorder/
+{ "identifiants": [3, 1, 7] }
+```
+
+L'ordre de la liste devient l'ordre d'affichage. Prévoyez un glisser-déposer :
+c'est le geste naturel, et l'appel est idempotent.
+
+### Réponse d'administration
+
+```json
+{
+  "id": 1, "titre": "Soldes de fin d'année",
+  "sous_titre": "Jusqu'à 40 % sur une sélection d'annonces",
+  "image": "http://.../media/publicites/2026/11/pub.jpg",
+  "libelle_action": "Voir les offres",
+  "type_cible": "PRODUIT", "type_cible_libelle": "Une annonce",
+  "cible_id": 11, "cible_url": "",
+  "actif": true, "ordre": 0,
+  "debut_le": null, "fin_le": null, "est_diffusable": true,
+  "nombre_affichages": 42, "nombre_clics": 7,
+  "cree_par": 1, "cree_par_username": "chef",
+  "created_at": "...", "updated_at": "..."
+}
+```
+
+La vue **publique** est volontairement plus pauvre : ni compteurs, ni
+fenêtre, ni auteur, ni `actif`. Un client n'a aucune raison de les connaître.
+
+`est_diffusable` combine `actif` et la fenêtre de diffusion — pratique pour
+une pastille « en ligne / hors ligne » dans la liste, sans recalculer les
+dates dans le navigateur.
+
+`nombre_affichages` et `nombre_clics` sont **indicatifs**. Ils sont
+incrémentés dans un point de sauvegarde isolé : un échec du compteur ne fait
+jamais tomber l'affichage du bandeau. Ne construisez aucun calcul de
+facturation dessus.
+
+### Droits
+
+Le groupe **Moderateur** a `view`, `add` et `change` sur les publicités, donc
+il gère le contenu du bandeau et son interrupteur. `delete_publicite` reste
+au **superutilisateur** : supprimer une publicité efface aussi ses
+compteurs, et la désactiver suffit dans presque tous les cas.
+
+---
+
 ## Ce que la console web n'a pas à faire
 
 Pour cadrer le périmètre, voici ce qui existe dans l'API mais **ne relève pas**
