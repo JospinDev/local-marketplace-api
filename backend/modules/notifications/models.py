@@ -39,6 +39,10 @@ class TypeNotification(models.TextChoices):
     RESERVATION_REFUSEE = "RESERVATION_REFUSEE", "Demande de reservation refusee"
     RESERVATION_ANNULEE = "RESERVATION_ANNULEE", "Reservation annulee"
     RESERVATION_EXPIREE = "RESERVATION_EXPIREE", "Reservation expiree"
+    VENTE_A_CONFIRMER = (
+        "VENTE_A_CONFIRMER",
+        "Le vendeur attend votre confirmation de reception",
+    )
     FAVORI_INDISPONIBLE = "FAVORI_INDISPONIBLE", "Un favori n'est plus disponible"
     VENDEUR_NOUVELLE_ANNONCE = (
         "VENDEUR_NOUVELLE_ANNONCE",

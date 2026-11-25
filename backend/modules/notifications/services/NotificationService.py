@@ -368,6 +368,31 @@ class NotificationService:
     # --------------------------------------------------------------- ventes
     @staticmethod
     @_sans_casser
+    def paiement_confirme(vente):
+        """Paiement declare recu par le vendeur, pour l'ACHETEUR.
+
+        Sans cette notification, l'acheteur n'apprend jamais que la balle
+        est dans son camp : c'est lui qui doit confirmer la reception pour
+        terminer la vente, et c'est ce geste seul qui ouvre le droit a un
+        avis. Il n'avait aucun signal, et aucune raison d'aller regarder.
+        """
+        return NotificationService.creer(
+            vente.acheteur,
+            TypeNotification.VENTE_A_CONFIRMER,
+            titre="Confirmez la reception",
+            message=(
+                f"{vente.vendeur.username} a confirme avoir recu votre "
+                f"paiement ({vente.montant_total} {vente.devise}). "
+                "Confirmez la reception du produit pour terminer la vente "
+                "et pouvoir laisser un avis."
+            ),
+            reference_type="vente",
+            reference_id=vente.pk,
+            declencheur=vente.vendeur,
+        )
+
+    @staticmethod
+    @_sans_casser
     def achat_confirme(vente):
         """Confirmation de reception par le client, pour le vendeur."""
         return NotificationService.creer(

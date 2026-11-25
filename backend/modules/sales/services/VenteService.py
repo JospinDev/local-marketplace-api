@@ -261,6 +261,13 @@ class VenteService:
         vente.save(
             update_fields=["statut", "statut_paiement", "confirmee_le", "updated_at"]
         )
+
+        # L'acheteur doit savoir que c'est maintenant a lui d'agir.
+        # Import local : le module des notifications importe les ventes
+        # pour serialiser ses evenements, un import global ferait un cycle.
+        from modules.notifications.services import NotificationService
+
+        NotificationService.paiement_confirme(vente)
         return vente
 
     @staticmethod
